@@ -1,0 +1,6 @@
+version: 2
+authtoken: 319yduGCAPxA49yPztiiHqUPTVU_5y58cUjDMQbxoLmgmaJ8w
+tunnels:
+  web:
+    addr: 3000
+    proto: http
