@@ -14,3 +14,17 @@
 
 - The server runs on port 3000.
 - Example endpoint: `/images/<username>`
+
+# Directory Structure
+
+└── scrape
+    ├── scrape.go
+├── .replit
+├── go.mod
+├── go.sum
+├── main.go
+├── ngrok.yml
+├── README.md
+├── replit.nix
+
+# End Directory Structure
