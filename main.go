@@ -149,6 +149,11 @@ func main() {
 		})
 	})
 
+	// Add handler for /favicon.ico
+	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNotFound) // Return 404 for favicon requests
+	})
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000" // fallback for local dev
