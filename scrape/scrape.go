@@ -13,23 +13,29 @@ type IGProfileInfo struct {
 	Followers    string
 }
 
+// GetIGProfileInfo fetches Instagram profile info safely for container deployment
 func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
-	// Replace with your phone's private IP and port from Every Proxy
+	// Replace this with your proxy (mobile or residential)
 	proxy := "http://192.168.120.122:8080"
 
-	// Create Chrome options to use the proxy
+	// Create Chromedp ExecAllocator with safe flags + proxy
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ProxyServer(proxy), // Set proxy
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.ProxyServer(proxy),
 	)
 
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
 
-	ctx, cancel := chromedp.NewContext(allocCtx)
-	defer cancel()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+
+	// Timeout to prevent hanging
+	ctx, cancelTimeout := context.WithTimeout(ctx, 20*time.Second)
+	defer cancelTimeout()
 
 	var imageurls []string
 	var profileImg string
