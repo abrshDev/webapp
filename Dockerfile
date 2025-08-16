@@ -1,9 +1,8 @@
-# Install Chrome dependencies and Chrome
+# Use Chromedp headless Chrome + Go
 FROM golang:1.24
 
+# Install dependencies for Chromedp
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg2 \
     ca-certificates \
     fonts-liberation \
     libappindicator3-1 \
@@ -22,23 +21,25 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     xdg-utils \
     --no-install-recommends && \
-    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Copy Go modules and download
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy all files
 COPY . .
 
+# Build the Go app
 RUN go build -o app
 
+# Set environment
 ENV PORT=3000
 
+# Expose port
 EXPOSE 3000
 
+# Run the app
 CMD ["./app"]
