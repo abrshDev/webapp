@@ -14,12 +14,27 @@ type IGProfileInfo struct {
 }
 
 func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
-	ctx, cancel := chromedp.NewContext(context.Background())
+	// Replace with your phone's private IP and port from Every Proxy
+	proxy := "http://192.168.120.122:8080"
+
+	// Create Chrome options to use the proxy
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ProxyServer(proxy), // Set proxy
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 
 	var imageurls []string
 	var profileImg string
 	var followers string
+
 	url := "https://www.instagram.com/" + username
 	jscode := `Array.from(document.querySelectorAll('article img')).slice(0,6).map(img => img.src)`
 

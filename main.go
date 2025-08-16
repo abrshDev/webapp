@@ -16,7 +16,15 @@ import (
 
 func main() {
 	app := fiber.New()
-	// Proxy-image endpoint to serve any image with CORS headers
+
+	// Mobile proxy from Every Proxy
+	proxy := "http://192.168.120.122:8080" // Replace with your phone IP and port
+	proxyURL, _ := url.Parse(proxy)
+	httpClient := &http.Client{
+		Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)},
+	}
+
+	// Proxy-image endpoint
 	app.Get("/proxy-image", func(c *fiber.Ctx) error {
 		imgUrl := c.Query("url")
 		if imgUrl == "" {
@@ -26,7 +34,7 @@ func main() {
 		if err != nil {
 			return c.Status(400).SendString("Invalid url parameter")
 		}
-		resp, err := http.Get(parsedUrl)
+		resp, err := httpClient.Get(parsedUrl)
 		if err != nil {
 			return c.Status(500).SendString("Failed to fetch image")
 		}
@@ -37,10 +45,9 @@ func main() {
 		return err
 	})
 
-	// Enable CORS for all origins
 	app.Use(cors.New())
 
-	// Proxy endpoint to serve images
+	// Proxy endpoint
 	app.Get("/proxy", func(c *fiber.Ctx) error {
 		imgUrl := c.Query("url")
 		if imgUrl == "" {
@@ -50,7 +57,7 @@ func main() {
 		if err != nil {
 			return c.Status(400).SendString("Invalid url parameter")
 		}
-		resp, err := http.Get(parsedUrl)
+		resp, err := httpClient.Get(parsedUrl)
 		if err != nil {
 			return c.Status(500).SendString("Failed to fetch image")
 		}
@@ -60,6 +67,7 @@ func main() {
 		return err
 	})
 
+	// Images endpoint
 	app.Get("/images/:username", func(c *fiber.Ctx) error {
 		username := c.Params("username")
 		info, err := scrape.GetIGProfileInfo(username)
@@ -69,11 +77,10 @@ func main() {
 			})
 		}
 
-		imgbbKey := "904775b3a745b64f07d3f6dff7407701" // Provided API key
+		imgbbKey := "904775b3a745b64f07d3f6dff7407701"
 		var imgbbLinks []string
 		for _, imgURL := range info.Images {
-			// Download image
-			resp, err := http.Get(imgURL)
+			resp, err := httpClient.Get(imgURL)
 			if err != nil {
 				continue
 			}
@@ -82,10 +89,8 @@ func main() {
 			if err != nil {
 				continue
 			}
-			// Encode image to base64
 			imgBase64 := base64.StdEncoding.EncodeToString(imgBytes)
 
-			// Upload to imgbb
 			data := url.Values{}
 			data.Set("key", imgbbKey)
 			data.Set("image", imgBase64)
@@ -94,8 +99,7 @@ func main() {
 				continue
 			}
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			client := &http.Client{}
-			res, err := client.Do(req)
+			res, err := httpClient.Do(req)
 			if err != nil {
 				continue
 			}
@@ -109,10 +113,9 @@ func main() {
 			}
 		}
 
-		// Upload profile image to imgbb
 		var profileImgLink string
 		if info.ProfileImage != "" {
-			resp, err := http.Get(info.ProfileImage)
+			resp, err := httpClient.Get(info.ProfileImage)
 			if err == nil {
 				imgBytes, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
@@ -124,8 +127,7 @@ func main() {
 					req, err := http.NewRequest("POST", "https://api.imgbb.com/1/upload", bytes.NewBufferString(data.Encode()))
 					if err == nil {
 						req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-						client := &http.Client{}
-						res, err := client.Do(req)
+						res, err := httpClient.Do(req)
 						if err == nil {
 							var result map[string]interface{}
 							json.NewDecoder(res.Body).Decode(&result)
@@ -149,14 +151,13 @@ func main() {
 		})
 	})
 
-	// Add handler for /favicon.ico
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusNotFound) // Return 404 for favicon requests
+		return c.SendStatus(fiber.StatusNotFound)
 	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000" // fallback for local dev
+		port = "3000"
 	}
 	app.Listen(":" + port)
 }
