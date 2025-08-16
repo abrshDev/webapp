@@ -34,7 +34,7 @@ func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
 	defer cancelCtx()
 
 	// Timeout to prevent hanging
-	ctx, cancelTimeout := context.WithTimeout(ctx, 20*time.Second)
+	ctx, cancelTimeout := context.WithTimeout(ctx, 60*time.Second)
 	defer cancelTimeout()
 
 	var imageurls []string
