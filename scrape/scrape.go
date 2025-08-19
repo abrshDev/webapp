@@ -2,6 +2,7 @@ package scrape
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -15,16 +16,18 @@ type IGProfileInfo struct {
 
 // GetIGProfileInfo fetches Instagram profile info safely for container deployment
 func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
-	// Replace this with your proxy (mobile or residential)
-	proxy := "http://192.168.120.122:8080"
+	chromePath := os.Getenv("HEADLESS_CHROME_PATH")
+	if chromePath == "" {
+		chromePath = "/usr/bin/chromium" // default path in Docker
+	}
 
-	// Create Chromedp ExecAllocator with safe flags + proxy
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath(chromePath),
 		chromedp.Flag("headless", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.ProxyServer(proxy),
+		// Removed proxy
 	)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -33,8 +36,7 @@ func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	defer cancelCtx()
 
-	// Timeout to prevent hanging
-	ctx, cancelTimeout := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancelTimeout := context.WithTimeout(ctx, 120*time.Second)
 	defer cancelTimeout()
 
 	var imageurls []string

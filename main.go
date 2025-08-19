@@ -17,14 +17,11 @@ import (
 func main() {
 	app := fiber.New()
 
-	// Mobile proxy from Every Proxy
-	proxy := "http://192.168.120.122:8080" // Replace with your phone IP and port
-	proxyURL, _ := url.Parse(proxy)
-	httpClient := &http.Client{
-		Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)},
-	}
+	httpClient := &http.Client{} // simple client, no proxy
 
-	// Proxy-image endpoint
+	app.Use(cors.New())
+
+	// Proxy-image endpoint (optional)
 	app.Get("/proxy-image", func(c *fiber.Ctx) error {
 		imgUrl := c.Query("url")
 		if imgUrl == "" {
@@ -45,59 +42,33 @@ func main() {
 		return err
 	})
 
-	app.Use(cors.New())
-
-	// Proxy endpoint
-	app.Get("/proxy", func(c *fiber.Ctx) error {
-		imgUrl := c.Query("url")
-		if imgUrl == "" {
-			return c.Status(400).SendString("Missing url parameter")
-		}
-		parsedUrl, err := url.QueryUnescape(imgUrl)
-		if err != nil {
-			return c.Status(400).SendString("Invalid url parameter")
-		}
-		resp, err := httpClient.Get(parsedUrl)
-		if err != nil {
-			return c.Status(500).SendString("Failed to fetch image")
-		}
-		defer resp.Body.Close()
-		c.Set("Content-Type", resp.Header.Get("Content-Type"))
-		_, err = io.Copy(c, resp.Body)
-		return err
-	})
-
 	// Images endpoint
 	app.Get("/images/:username", func(c *fiber.Ctx) error {
 		username := c.Params("username")
-		info, err := scrape.GetIGProfileInfo(username)
+		info, err := scrape.GetIGProfileInfo(username) // Scrape.do proxy used here
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{
-				"Error": "failed to scrape profile",
+				"error": err.Error(), // propagate actual error
 			})
 		}
 
-		imgbbKey := "904775b3a745b64f07d3f6dff7407701"
+		imgbbKey := os.Getenv("IMGBB_KEY")
 		var imgbbLinks []string
+
+		// Upload posts
 		for _, imgURL := range info.Images {
 			resp, err := httpClient.Get(imgURL)
 			if err != nil {
 				continue
 			}
-			imgBytes, err := io.ReadAll(resp.Body)
+			imgBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			if err != nil {
-				continue
-			}
-			imgBase64 := base64.StdEncoding.EncodeToString(imgBytes)
 
 			data := url.Values{}
 			data.Set("key", imgbbKey)
-			data.Set("image", imgBase64)
-			req, err := http.NewRequest("POST", "https://api.imgbb.com/1/upload", bytes.NewBufferString(data.Encode()))
-			if err != nil {
-				continue
-			}
+			data.Set("image", base64.StdEncoding.EncodeToString(imgBytes))
+
+			req, _ := http.NewRequest("POST", "https://api.imgbb.com/1/upload", bytes.NewBufferString(data.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			res, err := httpClient.Do(req)
 			if err != nil {
@@ -106,6 +77,7 @@ func main() {
 			var result map[string]interface{}
 			json.NewDecoder(res.Body).Decode(&result)
 			res.Body.Close()
+
 			if data, ok := result["data"].(map[string]interface{}); ok {
 				if url, ok := data["url"].(string); ok {
 					imgbbLinks = append(imgbbLinks, url)
@@ -113,36 +85,33 @@ func main() {
 			}
 		}
 
+		// Upload profile image
 		var profileImgLink string
 		if info.ProfileImage != "" {
 			resp, err := httpClient.Get(info.ProfileImage)
 			if err == nil {
-				imgBytes, err := io.ReadAll(resp.Body)
+				imgBytes, _ := io.ReadAll(resp.Body)
 				resp.Body.Close()
+
+				data := url.Values{}
+				data.Set("key", imgbbKey)
+				data.Set("image", base64.StdEncoding.EncodeToString(imgBytes))
+
+				req, _ := http.NewRequest("POST", "https://api.imgbb.com/1/upload", bytes.NewBufferString(data.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				res, err := httpClient.Do(req)
 				if err == nil {
-					imgBase64 := base64.StdEncoding.EncodeToString(imgBytes)
-					data := url.Values{}
-					data.Set("key", imgbbKey)
-					data.Set("image", imgBase64)
-					req, err := http.NewRequest("POST", "https://api.imgbb.com/1/upload", bytes.NewBufferString(data.Encode()))
-					if err == nil {
-						req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-						res, err := httpClient.Do(req)
-						if err == nil {
-							var result map[string]interface{}
-							json.NewDecoder(res.Body).Decode(&result)
-							res.Body.Close()
-							if data, ok := result["data"].(map[string]interface{}); ok {
-								if url, ok := data["url"].(string); ok {
-									profileImgLink = url
-								}
-							}
+					var result map[string]interface{}
+					json.NewDecoder(res.Body).Decode(&result)
+					res.Body.Close()
+					if data, ok := result["data"].(map[string]interface{}); ok {
+						if url, ok := data["url"].(string); ok {
+							profileImgLink = url
 						}
 					}
 				}
 			}
 		}
-		 
 
 		return c.JSON(fiber.Map{
 			"username":      username,

@@ -1,7 +1,6 @@
-# Use Chromedp headless Chrome + Go
 FROM golang:1.24
 
-# Install dependencies for Chromedp
+# Install dependencies + Chromium
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
@@ -20,26 +19,24 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    chromium \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy Go modules and download
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy all files
 COPY . .
 
-# Build the Go app
 RUN go build -o app
 
-# Set environment
+# Use Chromium for Chromedp
+ENV HEADLESS_CHROME_PATH=/usr/bin/chromium
+
 ENV PORT=3000
+ENV PROXY_URL="http://192.168.120.122:8080"
+ENV IMGBB_KEY="904775b3a745b64f07d3f6dff7407701"
 
-# Expose port
 EXPOSE 3000
-
-# Run the app
 CMD ["./app"]
