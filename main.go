@@ -23,7 +23,7 @@ func main() {
 	app.Use(cors.New())
 
 	// Proxy-image endpoint (optional)
-	app.Get("/proxy-image", func(c *fiber.Ctx) error {
+	/* app.Get("/proxy-image", func(c *fiber.Ctx) error {
 		imgUrl := c.Query("url")
 		log.Println("[Proxy-Image] Request URL:", imgUrl)
 
@@ -52,7 +52,7 @@ func main() {
 			log.Println("[Proxy-Image] Error sending image:", err)
 		}
 		return err
-	})
+	}) */
 
 	// Images endpoint
 	app.Get("/images/:username", func(c *fiber.Ctx) error {
