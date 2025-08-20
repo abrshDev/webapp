@@ -16,32 +16,43 @@ type IGProfileInfo struct {
 
 // GetIGProfileInfo fetches Instagram profile info safely for container deployment
 func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
-	chromePath := os.Getenv("HEADLESS_CHROME_PATH")
-	if chromePath == "" {
-		chromePath = "/usr/bin/chromium" // default path in Docker
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	// Detect Render environment
+	if os.Getenv("RENDER") != "" {
+		// Connect to Render's headless-shell
+		remoteURL := "ws://127.0.0.1:9223/devtools/browser"
+		allocatorCtx, allocCancel := chromedp.NewRemoteAllocator(context.Background(), remoteURL)
+		defer allocCancel()
+		ctx, cancel = chromedp.NewContext(allocatorCtx)
+	} else {
+		// Local: launch Chromium manually
+		chromePath := os.Getenv("HEADLESS_CHROME_PATH")
+		if chromePath == "" {
+			chromePath = "/usr/bin/chromium" // default path in Docker
+		}
+
+		opts := append(chromedp.DefaultExecAllocatorOptions[:],
+			chromedp.ExecPath(chromePath),
+			chromedp.Flag("headless", true),
+			chromedp.Flag("no-sandbox", true),
+			chromedp.Flag("disable-gpu", true),
+			chromedp.Flag("disable-dev-shm-usage", true),
+			chromedp.Flag("disable-software-rasterizer", true),
+			chromedp.Flag("no-zygote", true),
+			chromedp.Flag("single-process", true),
+			chromedp.Flag("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"),
+		)
+
+		allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+		defer cancelAlloc()
+		ctx, cancel = chromedp.NewContext(allocCtx)
 	}
 
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		   chromedp.ExecPath(chromePath),
-		chromedp.Flag("headless", "new"),
-		chromedp.Flag("no-sandbox", true),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-software-rasterizer", true),
-		chromedp.Flag("no-zygote", true),
-		chromedp.Flag("single-process", true),
-		chromedp.Flag("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"),
+	defer cancel()
 
-
-		// Removed proxy
-	)
-
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancelAlloc()
-
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
-	defer cancelCtx()
-
+	// Increase timeout
 	ctx, cancelTimeout := context.WithTimeout(ctx, 120*time.Second)
 	defer cancelTimeout()
 
