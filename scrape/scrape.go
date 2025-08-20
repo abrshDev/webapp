@@ -16,13 +16,11 @@ type IGProfileInfo struct {
 
 // GetIGProfileInfo fetches Instagram profile info safely for container deployment
 func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
-	// Determine Chrome path
 	chromePath := os.Getenv("HEADLESS_CHROME_PATH")
 	if chromePath == "" {
 		chromePath = "/usr/bin/chromium" // default path in Docker/local
 	}
 
-	// Setup Chrome options
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(chromePath),
 		chromedp.Flag("headless", true),
@@ -32,6 +30,10 @@ func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
 		chromedp.Flag("disable-software-rasterizer", true),
 		chromedp.Flag("no-zygote", true),
 		chromedp.Flag("single-process", true),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
 		chromedp.Flag("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"),
 	)
 
@@ -41,8 +43,8 @@ func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	defer cancelCtx()
 
-	// Increase timeout for slow networks / Instagram load
-	ctx, cancelTimeout := context.WithTimeout(ctx, 120*time.Second)
+	// Increased timeout to 180s
+	ctx, cancelTimeout := context.WithTimeout(ctx, 400*time.Second)
 	defer cancelTimeout()
 
 	var imageurls []string
@@ -54,8 +56,7 @@ func GetIGProfileInfo(username string) (*IGProfileInfo, error) {
 
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
-		chromedp.WaitVisible("header img", chromedp.ByQuery),
-		chromedp.Sleep(2*time.Second),
+		chromedp.Sleep(5*time.Second), // wait for page to load
 		chromedp.Evaluate(jscode, &imageurls),
 		chromedp.Evaluate(`document.querySelector('header img') ? document.querySelector('header img').src : ''`, &profileImg),
 		chromedp.Evaluate(`document.querySelector('header li span[title]') ? document.querySelector('header li span[title]').getAttribute('title') : ''`, &followers),
